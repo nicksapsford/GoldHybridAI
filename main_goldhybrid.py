@@ -21,10 +21,9 @@ from dotenv import load_dotenv
 
 PAPER_TRADING_MODE = True
 VERSION            = "1.0.8"
-# Morgan confidence a SHORT must clear before it can execute (System 3 Review,
-# 18 Jul 2026). 60 (not FTSE's 65): Gold SHORTs are directionally correct, just
-# need good timing -- a lower bar reflects genuine SHORT merit on Gold.
-MORGAN_SHORT_MIN   = 60
+# BIDIRECTIONAL (Nick's direct order, 23 Jul 2026): the Morgan SHORT gate has been
+# removed. SHORTs take the SAME confidence bar and pre-checks as LONGs -- the daily
+# SSL alone sets direction (BULL -> LONG, BEAR -> SHORT). No direction asymmetry.
 CANDLE_INTERVAL    = 300      # 5-minute candle loop (seconds)
 POSITION_INTERVAL  = 30       # position monitoring (seconds)
 HEARTBEAT_INTERVAL = 240      # liveness log at least this often, even when idle
@@ -364,28 +363,20 @@ def run_candle_tick(feed, stanley, account, ig) -> None:
     sig_5m = feed.composite_signal("5m")
     trend_1d = "LONG" if (bar_1d is not None and bar_1d.get("ssl_bull")) else "SHORT"
 
-    # ── Bidirectional regime direction (System 3 Review, Change 1) ──────────────
-    # Daily SSL sets the bias; Morgan gates SHORTs. Cautious bounce LONGs are allowed
-    # in a BEAR daily. Morgan is the COMPUTED confidence (what Arthur reads), ~58.
+    # ── Bidirectional regime direction (fully symmetric, 23 Jul 2026) ───────────
+    # Daily SSL sets direction both ways: BULL -> LONG, BEAR -> SHORT. No Morgan gate
+    # (Nick's direct order) -- SHORTs take the SAME confidence bar and pre-checks as
+    # LONGs. Neutral/NaN daily -> the 1h signal decides. Morgan is still COMPUTED and
+    # passed to Arthur as context (~58), it just no longer gates or biases direction.
     _morgan = get_perf_dashboard_dict().get("confidence_score")
     _morgan = 50.0 if _morgan is None else float(_morgan)
     _ssl_1d = bar_1d.get("ssl_bull") if bar_1d is not None else None
     if _ssl_1d is None or (isinstance(_ssl_1d, float) and pd.isna(_ssl_1d)):
         proposed_direction = sig_1h if sig_1h in ("LONG", "SHORT") else "BOTH"   # neutral daily
-    elif bool(_ssl_1d):                                   # BULL daily -> LONG bounce/trend
+    elif bool(_ssl_1d):                                   # BULL daily -> LONG
         proposed_direction = "LONG"
-    else:                                                 # BEAR daily
-        proposed_direction = "SHORT" if _morgan >= MORGAN_SHORT_MIN else "LONG"  # cautious LONG if Morgan<60
-
-    # Morgan SHORT gate: a SHORT needs Morgan >= 60 (also catches the neutral-daily
-    # path where the 1h signal is SHORT). Block before Arthur; no phantom (Section 6:
-    # phantom rows are genuine Arthur decisions only).
-    if proposed_direction == "SHORT" and _morgan < MORGAN_SHORT_MIN:
-        log.info("SHORT blocked -- Morgan below 60 threshold (current: %.1f)", _morgan)
-        _push_dashboard(stanley, account, ig, price, gbpusd, period,
-                        calendar_summary=cal_summary, connector_status=connector_status,
-                        trend_1d=trend_1d, trend_1h=sig_1h, signal_5m=sig_5m)
-        return
+    else:                                                 # BEAR daily -> SHORT
+        proposed_direction = "SHORT"
 
     ind_1d = _indicator_snapshot(bar_1d)
     ind_1h = _indicator_snapshot(bar_1h)

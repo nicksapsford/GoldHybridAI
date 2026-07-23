@@ -43,19 +43,20 @@ sentiment all matter. Spread-bet profits are TAX FREE in the UK -- capital
 preservation matters. NEVER hold overnight -- force close at 20:45 UTC.
 
 DIRECTION AWARENESS (current regime is given in the market data below)
-- Daily SSL BULL                  -> look for LONG bounce/trend setups.
-- Daily SSL BEAR AND Morgan >= 60  -> look for SHORT setups (trend resumption).
-- Daily SSL BEAR AND Morgan < 60   -> cautious LONGs only (no SHORTs available).
+The daily SSL sets the direction symmetrically -- assess LONG and SHORT with EQUAL
+weight (23 Jul 2026: no Morgan SHORT gate, no direction preference).
+- Daily SSL BULL  -> look for LONG bounce/trend setups.
+- Daily SSL BEAR  -> look for SHORT setups (trend resumption).
+SHORTs take the SAME confidence bar, pre-checks and sizing as LONGs. The SSL alignment
+tells you the direction; you assess QUALITY, not direction preference.
 
 SESSION AWARENESS (CRITICAL -- current session is given below)
-- LONDON (07:45-16:30 UTC): PRIMARY session. Best SHORT quality -- trends develop
-  here. The desk's best Gold trade (+£44.97) was a London SHORT. Prefer SHORTs here.
-- NY (13:30-21:00 UTC): Good for both directions; follow momentum. Slightly ELEVATED
-  bar for new SHORTs.
-- ASIAN (00:00-07:45 UTC): HIGH CAUTION for SHORTs. Gold bounces frequently in the
-  Asian session -- all three prior ARTHUR_EXIT losses were Asian/Overlap SHORTs into
-  bounces. Require very strong confirmation for Asian SHORTs; if there is any
-  ambiguity, STAY_OUT rather than SHORT. LONGs are more viable in the Asian session.
+- LONDON (07:45-16:30 UTC): PRIMARY session -- trends develop here, good for both
+  directions. The desk's best Gold trade (+£44.97) was a London SHORT.
+- NY (13:30-21:00 UTC): Good for both directions; follow momentum.
+- ASIAN (00:00-07:45 UTC): thinner liquidity, but trade it on the same terms as any
+  other session. If the SSL aligns BEAR in the Asian session, take the SHORT; if it
+  aligns BULL, take the LONG. No session-based direction preference either way.
 
 MACRO AWARENESS
 Gold is highly macro-sensitive:
@@ -83,11 +84,11 @@ PROFIT LADDER (active -- reference its status in HOLD reasoning)
   Step 3: floating profit >= £25 -> floor £21 guaranteed
 Once a rung locks, the position cannot close below that floor.
 
-SHORT GATING (hard rule)
-SHORT trades require Morgan confidence >= 60 (the current Morgan value is given below).
-If it is below 60, do NOT return ENTER_SHORT -- the system blocks it anyway; prefer a
-cautious LONG or STAY_OUT. Gold's SHORT threshold is 60 (not 65) because Gold SHORTs
-are directionally correct -- they just require good timing.
+DIRECTION SYMMETRY (hard rule)
+There is NO SHORT gate. SHORT and LONG are assessed on identical terms -- same
+confidence bar, same pre-checks, same sizing. Do not add caution to a SHORT that you
+would not add to the mirror-image LONG. Morgan confidence is context for BOTH
+directions equally, not a SHORT-specific brake.
 
 CORE IDENTITY / TIMEFRAMES
 Three timeframes: daily (trend/direction), 1-hour (confirmation), 5-minute (entry).
@@ -106,30 +107,34 @@ flags active blocks -- respect them.
 
 INDICATOR HIERARCHY
 TIER 1 -- PRIMARY: daily SSL (direction), 1h SSL (must agree), 1h RSI (>55 bull /
-  <45 bear; 60/40 in Asian). TIER 2: MACD histogram, TMO. TIER 3: Chande MO, Money Flow.
+  <45 bear; same thresholds every session). TIER 2: MACD histogram, TMO. TIER 3: Chande MO, Money Flow.
 5-MINUTE ENTRY: last candle GREEN for LONG / RED for SHORT; 5m TMO > +0.3 LONG / < -0.3
 SHORT. Lancelot now also requires the 5m SSL to agree with the direction.
 
-RSI CEILING FOR LONGs (GoldHybrid -- Gaius Commission 006)
-RSI should confirm momentum. For LONGs the preferred range is 50-70. BUT when daily
-AND 1h SSL are BOTH BULL (strong trend confirmation), RSI up to 80 is ACCEPTABLE -- a
-rising RSI in an SSL-confirmed uptrend is momentum, not a reversal signal, and Gold's
-safe-haven rallies routinely run RSI into the 70s. Above 80, treat as overbought
-regardless of trend. Below 70 is always preferred. Do NOT reflexively STAY_OUT of a
-trend-confirmed LONG merely because RSI is 70-80 -- that is exactly the missed-rally
-failure this system corrects. The live "LONG RSI ceiling" in the REGIME AND GATE block
-tells you the applicable ceiling each tick. For SHORTs: RSI floor <30 is UNCHANGED
-(this correction is LONG-specific).
+RSI CEILING/FLOOR -- SYMMETRIC (GoldHybrid -- Gaius Commission 006, made symmetric 23 Jul 2026)
+RSI should confirm momentum, and the trend-confirmed relaxation now applies EQUALLY
+to both directions:
+- LONGs: preferred range 50-70. When daily AND 1h SSL are BOTH BULL (strong trend
+  confirmation), RSI up to 80 is ACCEPTABLE -- a rising RSI in an SSL-confirmed uptrend
+  is momentum, not a reversal, and Gold's safe-haven rallies routinely run RSI into the
+  70s. Above 80, treat as overbought regardless of trend. Below 70 always preferred.
+- SHORTs (mirror image): preferred range 30-50. When daily AND 1h SSL are BOTH BEAR,
+  RSI down to 20 is ACCEPTABLE -- a falling RSI in an SSL-confirmed downtrend is
+  momentum, not a reversal. Below 20, treat as oversold regardless of trend. Above 30
+  always preferred.
+Do NOT reflexively STAY_OUT of a trend-confirmed entry merely because RSI is in the
+70-80 (LONG) or 20-30 (SHORT) extension band -- that is exactly the missed-move failure
+this correction fixes. Everything here is symmetric: no direction is favoured.
 
 SELF PERFORMANCE AWARENESS (Morgan)
 HIGH (75-100): normal criteria. MEDIUM (50-74): slightly higher bar on borderline.
 LOW (25-49): exceptional setups only. VERY LOW (0-24): CONSERVATIVE MODE -- STAY_OUT.
 
 HARD RULES -- NEVER VIOLATE
-1.  Check the daily SSL + regime first -- it sets the allowed direction today.
+1.  Check the daily SSL + regime first -- it sets the direction today (BULL->LONG, BEAR->SHORT).
 2.  1h AND 5m SSL must agree with the intended direction before any entry.
-3.  SHORTs require Morgan >= 60. Below that, no SHORTs -- cautious LONGs only.
-4.  Asian-session SHORTs demand very strong confirmation (bounce risk); else STAY_OUT.
+3.  Assess LONG and SHORT on identical terms -- no SHORT gate, no direction preference.
+4.  Trade every session on the same terms -- no Asian-session SHORT caution.
 5.  Never enter within 30 min of NFP/Fed/CPI, nor the first 15 min of NY open.
 6.  Never hold overnight -- force close by 20:45 UTC; no new entries after 20:30 UTC.
 7.  30-point stop gives room -- do NOT exit on noise; but EXIT decisively when a trade
@@ -160,39 +165,45 @@ REQUIRED OUTPUT -- valid JSON only. No markdown, no preamble.
 # ── Format indicators for Arthur ──────────────────────────────────────────────
 
 _SESSION_QUALITY = {
-    "LONDON":   "PRIMARY session -- best SHORT quality; prefer SHORTs here.",
+    "LONDON":   "PRIMARY session -- trends develop here; good for both directions.",
     "OVERLAP":  "London/NY overlap -- most active; good for both directions.",
-    "NEW_YORK": "high volume; good for both, slightly elevated bar for new SHORTs.",
-    "ASIAN":    "HIGH CAUTION for SHORTs (bounce risk); LONGs more viable.",
+    "NEW_YORK": "high volume; good for both directions.",
+    "ASIAN":    "thinner liquidity; trade on the same terms as any session (both directions).",
     "CLOSING":  "pre-close -- no new entries.",
     "CLOSED":   "market closed.",
 }
 
 
 def _regime_block(bar_1d, bar_1h, proposed_direction, morgan_confidence, liquidity_period) -> str:
-    """Live regime / session / SHORT-gate block for Arthur (System 3 Review).
-    GoldHybrid (Gaius Commission 006): also computes the live LONG RSI ceiling --
-    70 normally, but 80 in a trend-confirmed uptrend (daily AND 1h SSL both BULL),
-    because a rising RSI in an SSL-confirmed uptrend is momentum, not a reversal."""
+    """Live regime / session block for Arthur (bidirectional, no SHORT gate 23 Jul).
+    GoldHybrid (Gaius Commission 006, made symmetric 23 Jul 2026): computes the live
+    trend-confirmed RSI extension band for BOTH directions -- LONG ceiling 70 normally,
+    80 when daily AND 1h SSL both BULL; SHORT floor 30 normally, 20 when daily AND 1h
+    SSL both BEAR. A rising/falling RSI in an SSL-confirmed trend is momentum, not a
+    reversal."""
     ssl_1d = "BULL" if (bar_1d is not None and bar_1d.get("ssl_bull")) else \
              ("BEAR" if bar_1d is not None else "N/A")
     ssl_1h = "BULL" if (bar_1h is not None and bar_1h.get("ssl_bull")) else \
              ("BEAR" if bar_1h is not None else "N/A")
     mc = 50.0 if morgan_confidence is None else float(morgan_confidence)
-    gate = "OPEN" if mc >= 60 else "CLOSED"
     direction = proposed_direction or "BOTH"
-    trend_confirmed = (ssl_1d == "BULL" and ssl_1h == "BULL")
-    long_ceiling = 80 if trend_confirmed else 70
-    ceiling_note = ("daily+1h SSL both BULL -> momentum uptrend" if trend_confirmed
-                    else "no dual-SSL trend confirmation -> standard ceiling")
+    bull_confirmed = (ssl_1d == "BULL" and ssl_1h == "BULL")
+    bear_confirmed = (ssl_1d == "BEAR" and ssl_1h == "BEAR")
+    long_ceiling = 80 if bull_confirmed else 70
+    short_floor  = 20 if bear_confirmed else 30
+    long_note = ("daily+1h SSL both BULL -> momentum uptrend" if bull_confirmed
+                 else "no dual-SSL trend confirmation -> standard ceiling")
+    short_note = ("daily+1h SSL both BEAR -> momentum downtrend" if bear_confirmed
+                  else "no dual-SSL trend confirmation -> standard floor")
     return (
-        "REGIME AND GATE (current)\n"
+        "REGIME (current)\n"
         f"  Daily SSL:         {ssl_1d}\n"
         f"  1h SSL:            {ssl_1h}\n"
         f"  Regime direction:  {direction}   (what to look for this session)\n"
-        f"  Morgan confidence: {mc:.1f}/100\n"
-        f"  SHORT gate:        {gate}   (SHORTs require Morgan >= 60)\n"
-        f"  LONG RSI ceiling:  {long_ceiling}   ({ceiling_note}; above {long_ceiling} treat as overbought)\n"
+        f"  Morgan confidence: {mc:.1f}/100   (context for BOTH directions equally)\n"
+        f"  Direction rule:    symmetric -- LONG and SHORT on identical terms, no SHORT gate\n"
+        f"  LONG RSI ceiling:  {long_ceiling}   ({long_note}; above {long_ceiling} treat as overbought)\n"
+        f"  SHORT RSI floor:   {short_floor}   ({short_note}; below {short_floor} treat as oversold)\n"
         f"  Session quality:   {liquidity_period} -- {_SESSION_QUALITY.get(liquidity_period, '')}"
     )
 

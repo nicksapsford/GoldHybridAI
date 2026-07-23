@@ -26,8 +26,12 @@ NO_ENTRY_AFTER_MIN      = 20 * 60 + 30   # 20:30 UTC -- no new entries within 30
 
 RSI_LONG_NORMAL   = 52    # relaxed 55->52 (v1.0.6, backtest_gold validated)
 RSI_SHORT_NORMAL  = 48    # relaxed 45->48 (v1.0.6, backtest_gold validated)
-RSI_LONG_ASIAN    = 60    # tighter filter for thin Asian markets
-RSI_SHORT_ASIAN   = 40
+# BIDIRECTIONAL (23 Jul 2026): Asian-session tightening removed -- no session-based
+# direction filtering (Nick's direct order). Asian now uses the same RSI bar as every
+# other session, so a BEAR-aligned Asian setup takes a SHORT on the same terms as any
+# LONG. The is_asian flag is still computed/logged but no longer changes thresholds.
+RSI_LONG_ASIAN    = RSI_LONG_NORMAL
+RSI_SHORT_ASIAN   = RSI_SHORT_NORMAL
 
 CHOPPY_RSI_THRESHOLD    = 5.0
 CHOPPY_TMO_THRESHOLD    = 0.5
@@ -165,17 +169,15 @@ def check_liquidity_period(now_utc: Optional[datetime] = None) -> dict:
     result["liquidity_period"] = period
     result["is_asian"] = is_asian
     if is_asian:
-        log.info("  Asian session -- thin liquidity, requiring higher conviction (RSI 60/40).")
+        log.info("  Asian session -- flagged for logging only (no threshold change, bidirectional 23 Jul).")
     return result
 
 
 def check_daily_trend_filter(bar_1d: Optional[pd.Series], direction: str) -> dict:
-    """Bidirectional daily filter (System 3 Review, 18 Jul 2026). The daily SSL sets
-    the primary bias, but LONG bounce trades ARE permitted in a BEAR daily (the missed
-    +94pt of 9 Jul). Rules:
+    """Bidirectional daily filter. The daily SSL sets the direction symmetrically
+    (23 Jul 2026 -- Morgan SHORT gate removed; 1h/5m SSL alignment does the gating):
       BULL daily -> LONG only  (never SHORT into a bull daily).
-      BEAR daily -> SHORT (trend resumption) OR cautious LONG bounce -- the Morgan>=60
-                    SHORT gate (main) + 1h/5m SSL alignment do the fine-grained gating.
+      BEAR daily -> SHORT (trend resumption); cautious LONG bounces still permitted.
       NEUTRAL / no data -> both allowed."""
     if bar_1d is None:
         return _pass()
