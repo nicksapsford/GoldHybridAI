@@ -748,6 +748,18 @@ function confirmShutdown(){
     .catch(function(){ closeModal(); });
 }
 
+/* Manual Morgan reset (Nick-controlled -- replaces the old auto-floor). */
+function resetMorgan(){
+  if(!confirm('Reset Morgan confidence to 50? Do this only after reviewing the phantom data and trade history.')) return;
+  fetch('/api/reset-morgan', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      alert(res.confirmation || ('Morgan reset requested (to ' + (res.to || 50) + ').'));
+      if(typeof refreshDashboard === 'function') refreshDashboard();
+    })
+    .catch(function(){ alert('Morgan reset request failed.'); });
+}
+
 /* -- Formatting helpers --------------------------------------------------- */
 function fmt(v, dp){
   dp = (dp === undefined) ? 2 : dp;
@@ -859,9 +871,18 @@ function renderPerfCard(perf){
   var cons   = perf.conservative
     ? '<div style="margin-top:4px;padding:3px 6px;background:rgba(231,76,60,0.1);border:1px solid var(--red);border-radius:3px;font-size:10px;color:var(--red);font-weight:700;">CONSERVATIVE MODE -- STAY OUT</div>'
     : '';
-  var floor  = perf.morgan_floored
-    ? '<div style="margin-top:4px;padding:3px 6px;background:rgba(255,215,0,0.12);border:1px solid var(--gold);border-radius:3px;font-size:10px;color:var(--gold);font-weight:700;">MORGAN FLOOR: 50 ACTIVE (raw ' + (perf.morgan_raw != null ? perf.morgan_raw : '--') + ')</div>'
+  var mScore = (perf.morgan_raw != null ? perf.morgan_raw : score);
+  var lastReset = perf.morgan_last_reset
+    ? '<div style="margin-top:3px;font-weight:400;color:var(--muted);font-size:9px;">Morgan last reset: ' + perf.morgan_last_reset + '</div>'
     : '';
+  var floor  = perf.morgan_below_floor
+    ? '<div style="margin-top:4px;padding:5px 7px;background:rgba(231,76,60,0.12);border:1px solid var(--red);border-radius:3px;font-size:10px;color:var(--red);font-weight:700;">' +
+        '&#9888; MORGAN BELOW FLOOR — Score: ' + mScore + '/100<br>' +
+        '<span style="font-weight:400;color:var(--muted)">Review phantom data and trade history. Manual reset available.</span><br>' +
+        '<button onclick="resetMorgan()" style="margin-top:5px;padding:3px 9px;background:var(--red);color:#fff;border:none;border-radius:3px;font-size:10px;font-weight:700;cursor:pointer;">RESET MORGAN TO 50</button>' +
+        lastReset +
+      '</div>'
+    : lastReset;
   return '<div class="card"><div class="card-title gold">Arthur Self-Performance</div>' +
     '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">' +
     '<span style="font-size:10px;color:var(--muted);min-width:60px">Confidence</span>' +
@@ -1808,6 +1829,31 @@ def api_lift_confidence():
             json.dumps({"confidence": to, "reason": reason, "requested_utc": ts}),
             encoding="utf-8")
         return jsonify({"status": "lift_requested", "to": to,
+                        "note": "engine applies on next cycle (live, no restart)"})
+    except Exception as exc:
+        return jsonify({"status": "error", "error": str(exc)}), 500
+
+
+@app.route("/api/reset-morgan", methods=["POST"])
+def api_reset_morgan():
+    """Manual Morgan reset to 50 (Nick-controlled). Replaces the old automatic floor:
+    Morgan is allowed to drop below 50 and a dashboard warning fires; Nick reviews the
+    evidence and clicks RESET. This writes confidence_lift.json (engine applies live, no
+    restart) and records the reset timestamp for the dashboard/Archie Brief."""
+    import json
+    ts = datetime.now(timezone.utc)
+    ts_iso = ts.isoformat()
+    ts_disp = ts.strftime("%Y-%m-%d %H:%M UTC")
+    reason = "MANUAL MORGAN RESET to 50 via /api/reset-morgan (Nick). %s" % ts_disp
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        (LOG_DIR / "confidence_lift.json").write_text(
+            json.dumps({"confidence": 50.0, "reason": reason, "requested_utc": ts_iso}),
+            encoding="utf-8")
+        (LOG_DIR / "morgan_last_reset.json").write_text(
+            json.dumps({"reset_utc": ts_disp}), encoding="utf-8")
+        return jsonify({"status": "reset_requested", "to": 50,
+                        "confirmation": "Morgan reset to 50 at %s" % ts.strftime("%H:%M UTC"),
                         "note": "engine applies on next cycle (live, no restart)"})
     except Exception as exc:
         return jsonify({"status": "error", "error": str(exc)}), 500

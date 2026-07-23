@@ -33,17 +33,31 @@ _MORGAN_STATE_PATH = os.path.join(os.path.dirname(__file__), 'logs', 'morgan_con
 _morgan_lock = threading.Lock()
 _morgan_confidence = None
 
-# GoldHybrid (Gaius Commission 006): Morgan FLOOR. The reported confidence can never
-# fall below this, so Arthur never enters the LOW band after short-term losses. See
-# _apply_phantom_delta(). _MORGAN_RAW holds the last pre-floor value so the dashboard
-# can display "Morgan Floor: 50 active" when the floor is actually clamping.
-MORGAN_FLOOR = 50
-_MORGAN_RAW = 50
+# Morgan WARNING + MANUAL RESET (revised 23 Jul 2026, replaces the auto-floor).
+# There is NO automatic floor: Morgan tracks freely and MAY drop below 50. When it does,
+# morgan_below_floor() is True so the dashboard shows a warning + a manual RESET button.
+# Nick reviews the phantom/trade evidence and consciously resets to 50 (via
+# /api/reset-morgan -> confidence_lift.json, applied live by the engine). This preserves
+# Morgan's diagnostic value and keeps Nick in control -- an auto-floor silently hid drops.
+MORGAN_FLOOR = 50   # WARNING threshold only -- NOT an automatic clamp
+_MORGAN_LAST_RESET_PATH = os.path.join(os.path.dirname(__file__), 'logs', 'morgan_last_reset.json')
 
 
-def morgan_floor_active() -> bool:
-    """True when the Morgan floor is currently clamping (pre-floor confidence < 50)."""
-    return _MORGAN_RAW < MORGAN_FLOOR
+def morgan_below_floor(score) -> bool:
+    """True when reported Morgan confidence is below the 50 warning threshold."""
+    try:
+        return float(score) < MORGAN_FLOOR
+    except (TypeError, ValueError):
+        return False
+
+
+def last_morgan_reset():
+    """UTC timestamp string of the last manual Morgan reset, or None."""
+    try:
+        with open(_MORGAN_LAST_RESET_PATH) as f:
+            return json.load(f).get('reset_utc')
+    except Exception:
+        return None
 
 # CSV audit trail / persistence for Morgan confidence (append-only history). The
 # JSON store above holds the single current value; this CSV records every change
@@ -212,20 +226,14 @@ def process_new_phantom_verdicts(get_confidence_fn=None, set_confidence_fn=None)
 
 
 def _apply_phantom_delta(score):
-    """Fold the persisted individual-phantom confidence delta into a base score
-    exactly once. Centred on 50 so a neutral store leaves the score unchanged.
+    """Fold the persisted individual-phantom confidence delta into a base score exactly
+    once. Centred on 50 so a neutral store leaves the score unchanged.
 
-    GoldHybrid (Gaius Commission 006): apply the MORGAN FLOOR here. This is the single
-    point every reported confidence path flows through, and the band label is derived
-    from the value it returns -- so flooring at MORGAN_FLOOR (50) guarantees Morgan can
-    never fall into the LOW band ("exceptional setups only") after short-term losses.
-    Insurance, not the primary fix (Commission 006 found Morgan was 55-61, not LOW,
-    during the missed rally). The pre-floor value is recorded so the dashboard can show
-    when the floor is actively clamping."""
-    global _MORGAN_RAW
-    raw = int(max(0, min(100, score + (get_confidence() - 50.0))))
-    _MORGAN_RAW = raw
-    return int(max(MORGAN_FLOOR, raw))
+    NO automatic floor (revised 23 Jul 2026): Morgan may fall below 50 and report a LOW
+    band -- that drop is a genuine learning signal. A dashboard warning + a MANUAL reset
+    (morgan_below_floor / /api/reset-morgan) handle it, keeping Nick in control instead of
+    silently clamping to 50."""
+    return int(max(0, min(100, score + (get_confidence() - 50.0))))
 
 
 def get_stay_out_adjustment():
@@ -278,13 +286,17 @@ def _load_trades(trades_log: Path = TRADES_LOG) -> pd.DataFrame:
 def _compute_confidence(df: pd.DataFrame) -> dict:
     """Confidence score 0-100 based on recent performance. Conservative mode below 25."""
     if df.empty or len(df) < 5:
+        _empty_score = _apply_phantom_delta(max(0, min(100, 50 + get_stay_out_adjustment())))
+        _empty_level = ("HIGH" if _empty_score >= 75 else "MEDIUM" if _empty_score >= 50
+                        else "LOW" if _empty_score >= 25 else "VERY_LOW")
         return {
-            "confidence_score":  _apply_phantom_delta(max(0, min(100, 50 + get_stay_out_adjustment()))),
-            "confidence_level": "MEDIUM", "conservative": False,
+            "confidence_score":  _empty_score,
+            "confidence_level": _empty_level, "conservative": _empty_score < 25,
             "total_trades": 0, "win_rate": 0.0, "recent_5": [],
             "streak_type": "", "streak_count": 0,
             "strongest_conditions": [], "weakest_conditions": [],
-            "morgan_floored": morgan_floor_active(), "morgan_raw": _MORGAN_RAW,
+            "morgan_below_floor": morgan_below_floor(_empty_score),
+            "morgan_raw": _empty_score, "morgan_last_reset": last_morgan_reset(),
         }
 
     pnls     = df["pnl_gbp"].values
@@ -352,8 +364,9 @@ def _compute_confidence(df: pd.DataFrame) -> dict:
         "confidence_score":     score,
         "confidence_level":     level,
         "conservative":         score < 25,
-        "morgan_floored":       morgan_floor_active(),
-        "morgan_raw":           _MORGAN_RAW,
+        "morgan_below_floor":   morgan_below_floor(score),
+        "morgan_raw":           score,
+        "morgan_last_reset":    last_morgan_reset(),
         "total_trades":         total,
         "win_rate":             round(win_rate, 1),
         "recent_5":             list(reversed(recent_5)),

@@ -1,5 +1,5 @@
 # GoldHybrid A.I. — Albion Trading Desk
-**Version:** 1.0.0 | **Port:** 5043 | **Status:** Paper Trading | **Part of:** Hybrid Desk
+**Version:** 1.1.0 | **Port:** 5043 | **Status:** Paper Trading | **Part of:** Hybrid Desk
 
 Part of the Albion Trading Desk — a multi-system AI paper trading operation built by Nick, running on a dedicated Dell Optiplex (Windows 11 Pro).
 
@@ -22,10 +22,13 @@ fixed architecture. The two changes:
    SHORT RSI floor (<30) unchanged — the finding was LONG-specific. Implemented as a
    live per-tick ceiling in Arthur's REGIME block plus explicit prompt guidance (there
    was never a mechanical ceiling — the veto was Arthur's judgment).
-2. **Morgan floor at 50 (insurance).** The reported Morgan confidence can no longer fall
-   into the LOW band ("exceptional setups only") after short-term losses. Secondary —
-   Commission 006 found Morgan was 55-61 (not LOW) during the miss. The dashboard shows
-   "MORGAN FLOOR: 50 ACTIVE" with the pre-floor raw value whenever it clamps.
+2. **Morgan floor — warning + MANUAL reset (v1.1.0, was automatic in v1.0.0).** Morgan
+   tracks freely and MAY drop below 50 (a genuine learning signal). When it does, the
+   dashboard shows a "⚠️ MORGAN BELOW FLOOR" warning + a "RESET MORGAN TO 50" button, and
+   the Archie Brief flags it. Nick reviews the phantom/trade evidence and consciously
+   resets (via `/api/reset-morgan`, applied live). NOT an automatic clamp — an auto-floor
+   silently hid drops and removed Nick's visibility/control. Desk-wide principle for
+   hybrids: Morgan warning + manual reset, never an automatic floor.
 
 Everything else is identical to GoldTrader: Arthur entry+exit, 30pt stop / 50pt target /
 0.3 spread, session 22:00-21:00 UTC, Asian SHORT filter, Morgan SHORT gate ≥60,

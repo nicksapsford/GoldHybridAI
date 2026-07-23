@@ -607,6 +607,7 @@ def _apply_confidence_lift() -> None:
         reason = data.get("reason") or "CONFIDENCE LIFT -- manual override"
         prior = performance_gold.get_confidence()
         performance_gold.set_confidence(val, reason=reason)
+        invalidate_cache()   # so the reset/lift reflects on the next state push, not the next trade
         LIFT_FLAG.unlink(missing_ok=True)
         log.warning("Morgan CONFIDENCE LIFT applied live: %.1f -> %.1f (%s)", prior, val, reason)
     except Exception as _exc:

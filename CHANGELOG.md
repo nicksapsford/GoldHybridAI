@@ -1,3 +1,23 @@
+## [1.1.0] - 2026-07-23  —  Morgan floor: automatic → warning + manual reset
+### Changed — Morgan floor is no longer an automatic clamp (Nick's revision)
+The v1.0.0 automatic Morgan floor (silently reset to 50 whenever confidence dropped
+below 50) undermined Morgan's diagnostic value and removed Nick's visibility/control.
+Replaced with a WARNING + MANUAL RESET model:
+- `performance_gold.py`: removed the floor from `_apply_phantom_delta` — Morgan now
+  tracks freely and may report LOW/VERY_LOW. New `morgan_below_floor(score)` helper +
+  `last_morgan_reset()`; perf dict now exposes `morgan_below_floor`, `morgan_raw`
+  (actual score) and `morgan_last_reset` instead of `morgan_floored`.
+- `dashboard_gold.py`: removed the "MORGAN FLOOR: 50 ACTIVE" indicator. When Morgan < 50
+  the Arthur Self-Performance card shows a red "⚠️ MORGAN BELOW FLOOR — Score: X/100"
+  warning + a "RESET MORGAN TO 50" button (visible only when below floor) + last-reset
+  timestamp. New `/api/reset-morgan` endpoint writes `confidence_lift.json` (engine
+  applies live) + `morgan_last_reset.json`; `resetMorgan()` JS confirms before sending.
+- `main_goldhybrid.py`: `_apply_confidence_lift` now calls `invalidate_cache()` so a
+  reset/lift reflects on the next state push, not the next trade.
+- `archie_brief.py`: adds a "MORGAN WARNING: below floor (current: X/100)" line + last
+  manual reset timestamp when applicable.
+No trading-logic / RSI-ceiling / Arthur-prompt / phantom changes.
+
 ## [1.0.0] - 2026-07-22  —  GoldHybrid fork (surgical hybrid)
 ### Added — GoldHybrid, Hybrid Desk system (port 5043), cloned from GoldTrader v1.3.0
 Implements Gaius Commission 006 (Gold System Review). A SURGICAL hybrid: Arthur STILL

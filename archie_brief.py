@@ -205,6 +205,12 @@ def build_system_brief(state, system_name, asset_label, logs_dir=None, now_utc=N
     if start is not None and cur is not None:
         jr = " | Journey: %s->%s" % (_num(start, 0), _num(cur, 0))
     a("Score: %s/100 (%s)%s" % (perf.get("confidence_score", "--"), perf.get("confidence_level", "--"), jr))
+    if perf.get("morgan_below_floor"):
+        a("MORGAN WARNING: below floor (current: %s/100)" % perf.get("morgan_raw", perf.get("confidence_score", "--")))
+        a("  Manual reset required -- review phantom data and trade history before resetting.")
+    _lr = perf.get("morgan_last_reset")
+    if _lr:
+        a("Last manual reset: %s" % _lr)
     a("")
     a("STAY OUT QUALITY")
     dcount = soq.get("decisions")
