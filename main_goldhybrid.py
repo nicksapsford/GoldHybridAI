@@ -382,6 +382,18 @@ def run_candle_tick(feed, stanley, account, ig) -> None:
     ind_1h = _indicator_snapshot(bar_1h)
     ind_5m = _indicator_snapshot(bar_5m)
 
+    # ── Zone-3 MORGAN HARD BLOCK (three-zone model, 24 Jul 2026, Nick's direct order) ──
+    # Below 30, suspend NEW entries and let Gaius intervene. Existing open positions are
+    # unaffected -- when in a trade we fall through so Arthur still manages HOLD/EXIT.
+    # (Zone 2, 30-49, is WARNING only: trading continues, no code restriction here.)
+    if performance_gold.morgan_hard_block(_morgan) and not stanley.in_trade:
+        log.warning("MORGAN HARD BLOCK: confidence %.0f < 30 -- new entries suspended "
+                    "(Gaius intervention active)", _morgan)
+        _push_dashboard(stanley, account, ig, price, gbpusd, period,
+                        calendar_summary=cal_summary, connector_status=connector_status,
+                        trend_1d=trend_1d, trend_1h=sig_1h, signal_5m=sig_5m)
+        return
+
     checks = run_all_pre_checks(
         bar_1h=bar_1h, bar_5m=bar_5m, account=account,
         current_trade=stanley.current_trade, bar_1d=bar_1d,

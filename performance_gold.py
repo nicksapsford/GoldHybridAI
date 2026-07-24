@@ -39,14 +39,33 @@ _morgan_confidence = None
 # Nick reviews the phantom/trade evidence and consciously resets to 50 (via
 # /api/reset-morgan -> confidence_lift.json, applied live by the engine). This preserves
 # Morgan's diagnostic value and keeps Nick in control -- an auto-floor silently hid drops.
-MORGAN_FLOOR = 50   # WARNING threshold only -- NOT an automatic clamp
+# THREE-ZONE MORGAN MODEL (desk-wide, 24 Jul 2026 -- Nick's direct order):
+#   Zone 1 NORMAL   (>= 50) : trade as usual.
+#   Zone 2 WARNING  (30-49) : trading CONTINUES; dashboard shows a warning + manual
+#                             RESET button. Informational only -- no restriction.
+#   Zone 3 HARD BLOCK (< 30): NO new entries (existing positions still managed/exited);
+#                             Gaius System Intervention Protocol triggers.
+# The old "exceptional setups only" (<50) / "conservative STAY_OUT" (<25) postures are
+# REMOVED: Arthur's entry threshold is the SAME at any Morgan score above 30.
+MORGAN_FLOOR      = 50   # WARNING threshold (Zone 2 starts below this) -- NOT a clamp
+MORGAN_HARD_BLOCK = 30   # HARD BLOCK threshold (Zone 3: no new entries below this)
 _MORGAN_LAST_RESET_PATH = os.path.join(os.path.dirname(__file__), 'logs', 'morgan_last_reset.json')
 
 
 def morgan_below_floor(score) -> bool:
-    """True when reported Morgan confidence is below the 50 warning threshold."""
+    """True when Morgan is below the 50 WARNING threshold (Zone 2 or 3). Trading
+    continues in Zone 2 (30-49); the dashboard shows a warning + manual reset."""
     try:
         return float(score) < MORGAN_FLOOR
+    except (TypeError, ValueError):
+        return False
+
+
+def morgan_hard_block(score) -> bool:
+    """True when Morgan is below the 30 HARD BLOCK threshold (Zone 3). No new entries;
+    Gaius intervention fires. Existing open positions are still managed/exited."""
+    try:
+        return float(score) < MORGAN_HARD_BLOCK
     except (TypeError, ValueError):
         return False
 
@@ -284,14 +303,18 @@ def _load_trades(trades_log: Path = TRADES_LOG) -> pd.DataFrame:
 
 
 def _compute_confidence(df: pd.DataFrame) -> dict:
-    """Confidence score 0-100 based on recent performance. Conservative mode below 25."""
+    """Confidence score 0-100 based on recent performance. Zone-3 HARD BLOCK below 30
+    (no new entries); Zone-2 WARNING 30-49 (trading continues); NORMAL >=50."""
     if df.empty or len(df) < 5:
         _empty_score = _apply_phantom_delta(max(0, min(100, 50 + get_stay_out_adjustment())))
         _empty_level = ("HIGH" if _empty_score >= 75 else "MEDIUM" if _empty_score >= 50
                         else "LOW" if _empty_score >= 25 else "VERY_LOW")
         return {
             "confidence_score":  _empty_score,
-            "confidence_level": _empty_level, "conservative": _empty_score < 25,
+            "confidence_level": _empty_level,
+            # conservative now means Zone-3 HARD BLOCK (<30); it drives Gaius + dashboard.
+            "conservative": morgan_hard_block(_empty_score),
+            "morgan_hard_block": morgan_hard_block(_empty_score),
             "total_trades": 0, "win_rate": 0.0, "recent_5": [],
             "streak_type": "", "streak_count": 0,
             "strongest_conditions": [], "weakest_conditions": [],
@@ -363,7 +386,9 @@ def _compute_confidence(df: pd.DataFrame) -> dict:
     return {
         "confidence_score":     score,
         "confidence_level":     level,
-        "conservative":         score < 25,
+        # conservative now means Zone-3 HARD BLOCK (<30); it drives Gaius + dashboard.
+        "conservative":         morgan_hard_block(score),
+        "morgan_hard_block":    morgan_hard_block(score),
         "morgan_below_floor":   morgan_below_floor(score),
         "morgan_raw":           score,
         "morgan_last_reset":    last_morgan_reset(),
@@ -413,7 +438,7 @@ def get_performance_context(trades_log: Path = TRADES_LOG) -> str:
     lines = [
         "SELF PERFORMANCE AWARENESS (Morgan)",
         f"  Confidence:     {perf['confidence_score']}/100 {perf['confidence_level']}",
-        f"  Conservative:   {'YES -- STAY_OUT mode' if perf['conservative'] else 'No'}",
+        f"  Morgan zone:    {'HARD BLOCK (<30) -- no new entries' if perf['morgan_hard_block'] else 'WARNING (30-49) -- trading continues' if perf['morgan_below_floor'] else 'NORMAL (>=50)'}",
         f"  Total trades:   {perf['total_trades']}",
         f"  Win rate:       {perf['win_rate']}%",
         f"  Current streak: {perf['streak_count']} {perf['streak_type']}",
@@ -424,8 +449,9 @@ def get_performance_context(trades_log: Path = TRADES_LOG) -> str:
     if perf["weakest_conditions"]:
         lines.append("  Weakest:   " + ", ".join(perf["weakest_conditions"]))
     lines.append(
-        "\n  Confidence guide: HIGH(75+)=normal, MED(50-74)=raise bar, "
-        "LOW(25-49)=exceptional only, VERY_LOW(<25)=STAY OUT hard rule"
+        "\n  Confidence guide (context only -- does NOT change your entry threshold "
+        "above 30): >=50 NORMAL, 30-49 WARNING (trade normally; Nick reviews), "
+        "<30 HARD BLOCK (system suspends new entries; Gaius intervenes)."
     )
     return "\n".join(lines)
 
