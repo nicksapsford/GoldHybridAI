@@ -241,6 +241,17 @@ class PaperTraderGold:
         if self.current_trade is None:
             return None
         rate = gbpusd if gbpusd is not None else self._gbpusd
+        # stop-fill fidelity (Job 10, 24 Jul 2026, Nick-confirmed 23 Jul): on a
+        # STOP_LOSS exit ONLY, fill at the stop level rather than the observed price,
+        # which may have gapped through the stop between 30s monitor checks. Clamp the
+        # fill BEFORE P&L is computed so it feeds BOTH the USD and GBP P&L (strategy_gold
+        # .close sets exit_price = this price and derives pnl_usd/pnl_gbp from it via
+        # calculate_pnl). TAKE_PROFIT / ARTHUR_EXIT / FORCE_CLOSE keep the observed price.
+        if reason == "STOP_LOSS":
+            if self.current_trade.direction == "LONG":
+                price = max(self.current_trade.stop_loss, price)
+            else:
+                price = min(self.current_trade.stop_loss, price)
         from strategy_gold import close_trade
         trade = close_trade(self.current_trade, price, reason, rate)
         self.capital_gbp = round(self.capital_gbp + trade.pnl_gbp, 2)
